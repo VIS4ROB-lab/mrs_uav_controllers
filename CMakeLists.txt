@@ -3,7 +3,7 @@ project(mrs_uav_controllers)
 
 # set the correct standards
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -40,12 +40,14 @@ set(DEPENDENCIES
   sensor_msgs
   mrs_uav_managers
   Eigen3
-  mrs_mpc_solvers
   mrs_uav_testing
 )
 
+set(OPTIONAL_DEPENDENCIES
+  mrs_mpc_solvers
+)
+
 set(LIBRARIES
-  MrsUavControllers_MpcController
   MrsUavControllers_Se3Controller
   MrsUavControllers_FailsafeController
   MrsUavControllers_MidairActivationController
@@ -55,28 +57,57 @@ foreach(DEP IN LISTS DEPENDENCIES)
   find_package(${DEP} REQUIRED)
 endforeach()
 
+foreach(DEP IN LISTS OPTIONAL_DEPENDENCIES)
+  find_package(${DEP} QUIET)
+  if(${DEP}_FOUND)
+    message(STATUS "Found optional dependency: ${DEP}")
+    list(APPEND DEPENDENCIES ${DEP})
+  else()
+    message(WARNING "Optional dependency not found: ${DEP}")
+  endif()
+endforeach()
+
 include_directories(
   include
   ${mrs_lib_INCLUDE_DIRS}
   ${mrs_uav_managers_INCLUDE_DIRS}
-  ${mrs_mpc_solvers_INCLUDE_DIRS}
   ${mrs_uav_testing_INCLUDE_DIRS}
   ${rclcpp_INCLUDE_DIRS}
 )
 
-# MPC Controller
+# Add optional include directories if found
+if(mrs_mpc_solvers_FOUND)
+  include_directories(${mrs_mpc_solvers_INCLUDE_DIRS})
+endif()
 
-add_library(MrsUavControllers_MpcController SHARED
-  src/mpc_controller.cpp
-  src/common.cpp
-  )
+# MPC Controller (only if mrs_mpc_solvers is available)
 
-ament_target_dependencies(MrsUavControllers_MpcController
-  mrs_mpc_solvers
-  ${DEPENDENCIES}
-  )
+if(mrs_mpc_solvers_FOUND)
+  add_library(MrsUavControllers_MpcController SHARED
+    src/mpc_controller.cpp
+    src/common.cpp
+    )
 
-target_compile_definitions(MrsUavControllers_MpcController PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+  ament_target_dependencies(MrsUavControllers_MpcController
+    ${DEPENDENCIES}
+    )
+
+  # Link to the MPC solver library
+  target_link_libraries(MrsUavControllers_MpcController
+    ${mrs_mpc_solvers_LIBRARIES}
+    )
+  
+  target_include_directories(MrsUavControllers_MpcController PUBLIC
+    ${mrs_mpc_solvers_INCLUDE_DIRS}
+    )
+
+  target_compile_definitions(MrsUavControllers_MpcController PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+  
+  list(APPEND LIBRARIES MrsUavControllers_MpcController)
+  message(STATUS "Building MrsUavControllers_MpcController with mrs_mpc_solvers")
+else()
+  message(WARNING "Skipping MrsUavControllers_MpcController - mrs_mpc_solvers not found")
+endif()
 
 # SE3 Controller
 
@@ -86,7 +117,6 @@ add_library(MrsUavControllers_Se3Controller SHARED
   )
 
 ament_target_dependencies(MrsUavControllers_Se3Controller
-  mrs_mpc_solvers
   ${DEPENDENCIES}
   )
 
