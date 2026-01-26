@@ -1222,6 +1222,10 @@ void MpcController::MPC(const mrs_msgs::msg::UavState& uav_state,
 
     // TODO !! this is a very crude way of sampling from the desired full-state
     // prediction, which only works with the MpcTracker. Rework this please.
+    //
+    // TODO !! we should check the length of the incoming trajectory
+    //
+    // TODO !! we should resample the incoming trajectory.
 
     for (int i = 1; i < _horizon_length_; i++) {
       mpc_reference_x((i * _n_states_) + 0, 0) =
