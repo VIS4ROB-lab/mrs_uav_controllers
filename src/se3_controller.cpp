@@ -156,6 +156,9 @@ class Se3Controller : public mrs_uav_managers::Controller {
   void positionPassthrough(
       const mrs_msgs::msg::UavState& uav_state,
       const mrs_msgs::msg::TrackerCommand& tracker_command);
+  void trajectoryPassthrough(
+      const mrs_msgs::msg::UavState& uav_state,
+      const mrs_msgs::msg::TrackerCommand& tracker_command);
 
   void PIDVelocityOutput(const mrs_msgs::msg::UavState& uav_state,
                          const mrs_msgs::msg::TrackerCommand& tracker_command,
@@ -1891,6 +1894,67 @@ void Se3Controller::positionPassthrough(
 
   cmd.position = tracker_command.position;
   cmd.heading = tracker_command.heading;
+
+  last_control_output_.control_output = cmd;
+
+  // fill the unbiased desired accelerations
+  last_control_output_.desired_unbiased_acceleration = {};
+  last_control_output_.desired_orientation = {};
+  last_control_output_.desired_heading_rate = {};
+
+  // | ----------------- fill in the diagnostics ---------------- |
+
+  last_control_output_.diagnostics.ramping_up = false;
+
+  last_control_output_.diagnostics.mass_estimator = false;
+  last_control_output_.diagnostics.mass_difference = 0;
+
+  last_control_output_.diagnostics.disturbance_estimator = false;
+
+  last_control_output_.diagnostics.disturbance_bx_b = 0;
+  last_control_output_.diagnostics.disturbance_by_b = 0;
+
+  last_control_output_.diagnostics.disturbance_bx_w = 0;
+  last_control_output_.diagnostics.disturbance_by_w = 0;
+
+  last_control_output_.diagnostics.disturbance_wx_w = 0;
+  last_control_output_.diagnostics.disturbance_wy_w = 0;
+
+  last_control_output_.diagnostics.controller_enforcing_constraints = false;
+
+  last_control_output_.diagnostics.controller = "Se3Controller";
+}
+
+//}
+
+/* trajectoryPassthrough() //{ */
+
+void Se3Controller::trajectoryPassthrough(
+    const mrs_msgs::msg::UavState& uav_state,
+    const mrs_msgs::msg::TrackerCommand& tracker_command) {
+  if (!tracker_command.use_position_vertical ||
+      !tracker_command.use_position_horizontal ||
+      !tracker_command.use_velocity_vertical ||
+      !tracker_command.use_velocity_horizontal ||
+      !tracker_command.use_acceleration ||
+      !tracker_command.use_heading ||
+      !tracker_command.use_heading_rate) {
+    RCLCPP_ERROR(
+        node_->get_logger(),
+        "[Se3Controller]: the tracker did not provide position+hdg reference");
+    return;
+  }
+
+  mrs_msgs::msg::HwApiTrajectoryCmd cmd;
+
+  cmd.header.frame_id = uav_state.header.frame_id;
+  cmd.header.stamp = clock_->now();
+
+  cmd.position = tracker_command.position;
+  cmd.velocity = tracker_command.velocity;
+  cmd.acceleration = tracker_command.acceleration;
+  cmd.heading = tracker_command.heading;
+  cmd.heading_rate = tracker_command.heading_rate;
 
   last_control_output_.control_output = cmd;
 

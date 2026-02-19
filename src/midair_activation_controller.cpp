@@ -236,6 +236,34 @@ MidairActivationController::ControlOutput MidairActivationController::updateActi
     break;
   }
 
+  case common::TRAJECTORY: {
+
+    mrs_msgs::msg::HwApiTrajectoryCmd cmd;
+
+    cmd.header.stamp    = clock_->now();
+    cmd.header.frame_id = uav_state.header.frame_id;
+
+    cmd.position.x = uav_state.pose.position.x;
+    cmd.position.y = uav_state.pose.position.y;
+    cmd.position.z = uav_state.pose.position.z;
+
+    cmd.velocity.x = uav_state.velocity.linear.x;
+    cmd.velocity.y = uav_state.velocity.linear.y;
+    cmd.velocity.z = uav_state.velocity.linear.z;
+
+    cmd.acceleration.x = uav_state.acceleration.linear.x;
+    cmd.acceleration.y = uav_state.acceleration.linear.y;
+    cmd.acceleration.z = uav_state.acceleration.linear.z;
+
+    cmd.heading = getHeadingSafely(uav_state, tracker_command);
+
+    cmd.heading_rate = 0;
+
+    control_output.control_output = cmd;
+
+    break;
+  }
+
   case common::VELOCITY_HDG: {
 
     mrs_msgs::msg::HwApiVelocityHdgCmd cmd;

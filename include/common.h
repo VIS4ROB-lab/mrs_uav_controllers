@@ -22,7 +22,8 @@ enum CONTROL_OUTPUT
   ACCELERATION_HDG,
   VELOCITY_HDG_RATE,
   VELOCITY_HDG,
-  POSITION
+  POSITION,
+  TRAJECTORY,
 };
 
 Eigen::Vector3d orientationError(const Eigen::Matrix3d& R, const Eigen::Matrix3d& Rd);
@@ -88,6 +89,9 @@ struct HwApiCmdExtractThrottleVisitor
     return std::nullopt;
   }
   std::optional<double> operator()([[maybe_unused]] const mrs_msgs::msg::HwApiPositionCmd& msg) {
+    return std::nullopt;
+  }
+  std::optional<double> operator()([[maybe_unused]] const mrs_msgs::msg::HwApiTrajectoryCmd& msg) {
     return std::nullopt;
   }
 };
