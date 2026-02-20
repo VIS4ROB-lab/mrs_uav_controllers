@@ -162,6 +162,10 @@ std::optional<CONTROL_OUTPUT> getLowestOuput(const mrs_uav_managers::control_man
     return VELOCITY_HDG;
   }
 
+  if (outputs.trajectory) {
+    return TRAJECTORY;
+  }
+
   if (outputs.position) {
     return POSITION;
   }
@@ -177,6 +181,10 @@ std::optional<CONTROL_OUTPUT> getHighestOuput(const mrs_uav_managers::control_ma
 
   if (outputs.position) {
     return POSITION;
+  }
+
+  if (outputs.trajectory) {
+    return TRAJECTORY;
   }
 
   if (outputs.velocity_hdg) {
