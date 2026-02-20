@@ -101,6 +101,14 @@ private:
 
   mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped> sh_hw_api_orientation_;
 
+  // | ----------------------- position control ---------------------- |
+
+  double position_x_setpoint_;
+  double position_y_setpoint_;
+  double position_z_setpoint_;
+
+  mrs_lib::SubscriberHandler<geometry_msgs::msg::PointStamped> sh_hw_api_position_;
+
   // | ------------------ activation and output ----------------- |
 
   ControlOutput last_control_output_;
@@ -189,6 +197,9 @@ bool FailsafeController::initialize(const rclcpp::Node::SharedPtr &node, std::sh
   sh_hw_api_orientation_ =
       mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped>(shopts, "/" + common_handlers->uav_name + "/" + "hw_api/orientation");
 
+  sh_hw_api_position_ =
+      mrs_lib::SubscriberHandler<geometry_msgs::msg::PointStamped>(shopts, "/" + common_handlers->uav_name + "/" + "hw_api/position");
+
   // | ----------- calculate the default hover throttle ----------- |
 
   hover_throttle_ = mrs_lib::quadratic_throttle_model::forceToThrottle(common_handlers_->throttle_model, _uav_mass_ * common_handlers_->g);
@@ -244,6 +255,27 @@ bool FailsafeController::activate(const ControlOutput &last_control_output) {
       RCLCPP_ERROR(node_->get_logger(), "[FailsafeController]: missing orientation from HW API, activated with heading = 0 rad");
 
       heading_setpoint_ = 0;
+    }
+
+    // | -------------- calculate the initial position setpoint ------------- |
+
+    if (sh_hw_api_position_.getMsg()) {
+
+      auto hw_api_position = sh_hw_api_position_.getMsg();
+
+      position_x_setpoint_ = hw_api_position->point.x;
+      position_y_setpoint_ = hw_api_position->point.y;
+      position_z_setpoint_ = 0;
+
+      RCLCPP_INFO(node_->get_logger(), "[FailsafeController]: activated with position setpoint = [%.2f, %.2f, %.2f]", position_x_setpoint_, position_y_setpoint_, position_z_setpoint_);
+
+    } else {
+
+      RCLCPP_ERROR(node_->get_logger(), "[FailsafeController]: missing position from HW API, activated with position setpoint = [0.0, 0.0, 0.0]");
+
+      position_x_setpoint_ = 0;
+      position_y_setpoint_ = 0;
+      position_z_setpoint_ = 0;
     }
 
     activation_control_output_ = last_control_output;
@@ -365,6 +397,36 @@ FailsafeController::ControlOutput FailsafeController::updateActive(const mrs_msg
 
   if (highest_modality.value() == common::POSITION) {
     RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[FailsafeController]: returning empty command, because we are at the position modality");
+    return control_output;
+  }
+
+  // --------------------------------------------------------------
+  // |                       trajectory output                      |
+  // --------------------------------------------------------------
+
+  if (highest_modality.value() == common::TRAJECTORY) {
+
+    mrs_msgs::msg::HwApiTrajectoryCmd traj_cmd;
+
+    traj_cmd.header.stamp = clock_->now();
+
+    traj_cmd.position.x = position_x_setpoint_;
+    traj_cmd.position.y = position_y_setpoint_;
+    traj_cmd.position.z = position_z_setpoint_;
+
+    traj_cmd.velocity.x = 0;
+    traj_cmd.velocity.y = 0;
+    traj_cmd.velocity.z = -_descend_speed_;
+
+    traj_cmd.acceleration.x = 0;
+    traj_cmd.acceleration.y = 0;
+    traj_cmd.acceleration.z = -_descend_acceleration_;
+
+    traj_cmd.heading    = heading_setpoint_;
+    traj_cmd.heading_rate = 0.0;
+
+    control_output.control_output = traj_cmd;
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "[FailsafeController]: returning trajectory command");
     return control_output;
   }
 
