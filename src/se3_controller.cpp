@@ -34,6 +34,8 @@ typedef mrs_lib::ThreadTimer TimerType;
 #define OUTPUT_CONTROL_GROUP 1
 #define OUTPUT_ATTITUDE_RATE 2
 #define OUTPUT_ATTITUDE 3
+#define OUTPUT_POSITION 4
+#define OUTPUT_TRAJECTORY 5
 
 //}
 
@@ -458,10 +460,12 @@ bool Se3Controller::initialize(
   if (!(drs_params_.preferred_output_mode == OUTPUT_ACTUATORS ||
         drs_params_.preferred_output_mode == OUTPUT_CONTROL_GROUP ||
         drs_params_.preferred_output_mode == OUTPUT_ATTITUDE_RATE ||
-        drs_params_.preferred_output_mode == OUTPUT_ATTITUDE)) {
+        drs_params_.preferred_output_mode == OUTPUT_ATTITUDE ||
+        drs_params_.preferred_output_mode == OUTPUT_POSITION ||
+        drs_params_.preferred_output_mode == OUTPUT_TRAJECTORY)) {
     RCLCPP_ERROR(
         node_->get_logger(),
-        "[Se3Controller]: preferred output mode has to be {0, 1, 2, 3}!");
+        "[Se3Controller]: preferred output mode has to be {0, 1, 2, 3, 4, 5}!");
     return false;
   }
 
@@ -778,11 +782,26 @@ Se3Controller::ControlOutput Se3Controller::updateActive(
     RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000,
                           "[Se3Controller]: prioritizing actuators output");
     lowest_modality = common::ACTUATORS_CMD;
+  } else if (drs_params.preferred_output_mode == OUTPUT_POSITION &&
+             common_handlers_->control_output_modalities.position) {
+    RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000,
+                          "[Se3Controller]: prioritizing position output");
+    lowest_modality = common::POSITION;
+  } else if (drs_params.preferred_output_mode == OUTPUT_TRAJECTORY &&
+             common_handlers_->control_output_modalities.trajectory) {
+    RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000,
+                          "[Se3Controller]: prioritizing trajectory output");
+    lowest_modality = common::TRAJECTORY;
   }
 
   switch (lowest_modality.value()) {
     case common::POSITION: {
       positionPassthrough(uav_state, tracker_command);
+      break;
+    }
+
+    case common::TRAJECTORY: {
+      trajectoryPassthrough(uav_state, tracker_command);
       break;
     }
 
@@ -1936,8 +1955,7 @@ void Se3Controller::trajectoryPassthrough(
       !tracker_command.use_position_horizontal ||
       !tracker_command.use_velocity_vertical ||
       !tracker_command.use_velocity_horizontal ||
-      !tracker_command.use_acceleration ||
-      !tracker_command.use_heading ||
+      !tracker_command.use_acceleration || !tracker_command.use_heading ||
       !tracker_command.use_heading_rate) {
     RCLCPP_ERROR(
         node_->get_logger(),

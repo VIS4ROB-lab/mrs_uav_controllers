@@ -36,6 +36,8 @@ typedef mrs_lib::ThreadTimer TimerType;
 #define OUTPUT_CONTROL_GROUP 1
 #define OUTPUT_ATTITUDE_RATE 2
 #define OUTPUT_ATTITUDE 3
+#define OUTPUT_POSITION 4
+#define OUTPUT_TRAJECTORY 5
 
 namespace mrs_uav_controllers {
 
@@ -524,9 +526,11 @@ bool MpcController::initialize(
   if (!(drs_params_.preferred_output_mode == OUTPUT_ACTUATORS ||
         drs_params_.preferred_output_mode == OUTPUT_CONTROL_GROUP ||
         drs_params_.preferred_output_mode == OUTPUT_ATTITUDE_RATE ||
-        drs_params_.preferred_output_mode == OUTPUT_ATTITUDE)) {
+        drs_params_.preferred_output_mode == OUTPUT_ATTITUDE ||
+        drs_params_.preferred_output_mode == OUTPUT_POSITION ||
+        drs_params_.preferred_output_mode == OUTPUT_TRAJECTORY)) {
     RCLCPP_ERROR(node_->get_logger(),
-                 "[%s]: preferred output mode has to be {0, 1, 2, 3}!",
+                 "[%s]: preferred output mode has to be {0, 1, 2, 3, 4, 5}!",
                  this->name_.c_str());
     return false;
   }
@@ -840,11 +844,27 @@ MpcController::ControlOutput MpcController::updateActive(
     RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000,
                           "[%s]: prioritizing actuators output", name_.c_str());
     lowest_modality = common::ACTUATORS_CMD;
+  } else if (drs_params.preferred_output_mode == OUTPUT_POSITION &&
+             common_handlers_->control_output_modalities.position) {
+    RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000,
+                          "[%s]: prioritizing position output", name_.c_str());
+    lowest_modality = common::POSITION;
+  } else if (drs_params.preferred_output_mode == OUTPUT_TRAJECTORY &&
+             common_handlers_->control_output_modalities.trajectory) {
+    RCLCPP_DEBUG_THROTTLE(node_->get_logger(), *clock_, 1000,
+                          "[%s]: prioritizing trajectory output",
+                          name_.c_str());
+    lowest_modality = common::TRAJECTORY;
   }
 
   switch (lowest_modality.value()) {
     case common::POSITION: {
       positionPassthrough(uav_state, tracker_command);
+      break;
+    }
+
+    case common::TRAJECTORY: {
+      trajectoryPassthrough(uav_state, tracker_command);
       break;
     }
 
