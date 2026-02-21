@@ -2307,8 +2307,7 @@ void MpcController::trajectoryPassthrough(
 
   mrs_msgs::msg::HwApiTrajectoryCmd cmd;
 
-  cmd.header.frame_id = uav_state.header.frame_id;
-  cmd.header.stamp = clock_->now();
+  cmd.header = tracker_command.header;
 
   cmd.position = tracker_command.position;
   cmd.velocity = tracker_command.velocity;

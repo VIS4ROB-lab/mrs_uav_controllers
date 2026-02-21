@@ -240,7 +240,7 @@ MidairActivationController::ControlOutput MidairActivationController::updateActi
 
     mrs_msgs::msg::HwApiTrajectoryCmd cmd;
 
-    cmd.header.stamp    = clock_->now();
+    cmd.header.stamp = clock_->now();
     cmd.header.frame_id = uav_state.header.frame_id;
 
     cmd.position.x = uav_state.pose.position.x;

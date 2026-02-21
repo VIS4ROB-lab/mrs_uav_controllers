@@ -98,6 +98,7 @@ private:
   // | ----------------------- yaw control ---------------------- |
 
   double heading_setpoint_;
+  std::string heading_setpoint_frame_id_;
 
   mrs_lib::SubscriberHandler<geometry_msgs::msg::QuaternionStamped> sh_hw_api_orientation_;
 
@@ -106,6 +107,7 @@ private:
   double position_x_setpoint_;
   double position_y_setpoint_;
   double position_z_setpoint_;
+  std::string position_setpoint_frame_id_;
 
   mrs_lib::SubscriberHandler<geometry_msgs::msg::PointStamped> sh_hw_api_position_;
 
@@ -246,6 +248,7 @@ bool FailsafeController::activate(const ControlOutput &last_control_output) {
 
       auto hw_api_orientation = sh_hw_api_orientation_.getMsg();
 
+      heading_setpoint_frame_id_ = hw_api_orientation->header.frame_id;
       heading_setpoint_ = getHeadingSafely(hw_api_orientation);
 
       RCLCPP_INFO(node_->get_logger(), "[FailsafeController]: activated with heading = %.2f rad", heading_setpoint_);
@@ -254,6 +257,7 @@ bool FailsafeController::activate(const ControlOutput &last_control_output) {
 
       RCLCPP_ERROR(node_->get_logger(), "[FailsafeController]: missing orientation from HW API, activated with heading = 0 rad");
 
+      heading_setpoint_frame_id_ = uav_state.header.frame_id;
       heading_setpoint_ = 0;
     }
 
@@ -263,6 +267,7 @@ bool FailsafeController::activate(const ControlOutput &last_control_output) {
 
       auto hw_api_position = sh_hw_api_position_.getMsg();
 
+      position_setpoint_frame_id_ = hw_api_position->header.frame_id;
       position_x_setpoint_ = hw_api_position->point.x;
       position_y_setpoint_ = hw_api_position->point.y;
       position_z_setpoint_ = 0;
@@ -273,6 +278,7 @@ bool FailsafeController::activate(const ControlOutput &last_control_output) {
 
       RCLCPP_ERROR(node_->get_logger(), "[FailsafeController]: missing position from HW API, activated with position setpoint = [0.0, 0.0, 0.0]");
 
+      position_setpoint_frame_id_ = uav_state.header.frame_id;
       position_x_setpoint_ = 0;
       position_y_setpoint_ = 0;
       position_z_setpoint_ = 0;
@@ -409,6 +415,7 @@ FailsafeController::ControlOutput FailsafeController::updateActive(const mrs_msg
     mrs_msgs::msg::HwApiTrajectoryCmd traj_cmd;
 
     traj_cmd.header.stamp = clock_->now();
+    traj_cmd.header.frame_id = position_setpoint_frame_id_;
 
     traj_cmd.position.x = position_x_setpoint_;
     traj_cmd.position.y = position_y_setpoint_;
